@@ -13,4 +13,4 @@ wheels/
 .env
 
 # Local database
-.db
+*.db
