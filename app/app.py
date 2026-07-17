@@ -1,50 +1,55 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Depends
 from app.schemas import PostCreate, PostResponse
 from app.db import Post, create_db_and_tables, get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
+from sqlalchemy import select
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-     await create_db_and_tables()
-     yield
+    await create_db_and_tables()
+    yield
 
 app = FastAPI(lifespan=lifespan)
 
-text_posts = {
-    1: {"title": "Getting Started with FastAPI", "content": "This is my first post while learning how to build APIs with FastAPI."},
-    2: {"title": "Understanding API Routes", "content": "Routes determine which function runs when a user visits a specific API endpoint."},
-    3: {"title": "Using Path Parameters", "content": "Path parameters allow an API endpoint to accept values directly from the URL."},
-    4: {"title": "Working with Query Parameters", "content": "Query parameters can be used to filter or customise the data returned by an API."},
-    5: {"title": "Creating a New Post", "content": "FastAPI makes it simple to receive JSON data and create new resources."},
-    6: {"title": "Updating Existing Data", "content": "PUT and PATCH requests can be used to update existing posts."},
-    7: {"title": "Deleting a Post", "content": "DELETE requests allow users to remove resources from the application."},
-    8: {"title": "Using Pydantic Models", "content": "Pydantic models validate incoming data and ensure it follows the expected structure."},
-    9: {"title": "FastAPI Automatic Documentation", "content": "FastAPI automatically generates interactive API documentation using Swagger UI."},
-    10: {"title": "Next Steps", "content": "The next stage of this project is connecting the FastAPI application to a database."}
-}
+@app.post("/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    caption: str = Form(""),
+    session: AsyncSession = Depends(get_async_session)
+):
+    post = Post(
+        caption=caption,
+        url="dummy url",
+        file_type="photo",
+        file_name="dummy name"
+    )
 
-# All posts
-@app.get("/posts")
-def get_all_posts(limit: int = None):
-    if limit:
-         return list(text_posts.values())[:limit]
-    
-    return text_posts
+    session.add(post)
+    await session.commit()
+    await session.refresh(post)
 
-# Single post with path parameter
-@app.get("/posts/{id}")
-def get_post(id: int) -> PostResponse:
-    if id not in text_posts:
-            raise HTTPException(status_code=404, detail="Post not found")
-    
-    return text_posts.get(id)
+    return post
 
-# Post post
-@app.post("/posts")
-def create_post(post: PostCreate) -> PostResponse:
-    new_post = {"title": post.title, "content": post.content}
-    text_posts[max(text_posts.keys()) + 1] = new_post
-    return new_post
+@app.get("/feed")
+async def get_feed(
+    session: AsyncSession = Depends(get_async_session)
+):
+    result = await session.execute(select(Post).order_by(Post.created_at.desc()))
+    posts = [row[0] for row in result.all()]
 
+    posts_data = []
+    for post in posts:
+        posts_data.append(
+            {
+                "id": str(post.id),
+                "caption": post.caption,
+                "url": post.url,
+                "file_type": post.file_type,
+                "file_name": post.file_name,
+                "created_at": post.created_at.isoformat()
+            }
+        )
+
+    return {"posts": posts_data}
