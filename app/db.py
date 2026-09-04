@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import DeclarativeBase, relationship
 from datetime import datetime
 
-DATABASE_URL = "sqlite+aiosqlite:///./test.db"  # Local database file
+DATABASE_URL = "sqlite+aiosqlite:///./test.db"
 
 class Base(DeclarativeBase):
     pass
@@ -23,6 +23,7 @@ class Post(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 # Create database
+
 engine = create_async_engine(DATABASE_URL)
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
